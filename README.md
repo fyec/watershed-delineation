@@ -1,39 +1,25 @@
-Watershed Delineation
+# Watershed Delineation
 
-A Python package for automatic watershed delineation from a Digital Elevation Model (DEM) and a pour point (longitude & latitude).
-The tool uses WhiteboxTools and GeoPandas to perform hydrologic analysis and export watershed shapefiles with attributes.
+A Python package for automatic watershed delineation from a Digital Elevation Model (DEM) and a pour point (longitude & latitude).  
+It uses [WhiteboxTools](https://github.com/jblindsay/whitebox-tools), [GeoPandas](https://geopandas.org/), and [Rasterio](https://rasterio.readthedocs.io/) to perform hydrologic analysis and export shapefiles with watershed attributes.
 
-Installation
+---
 
-Clone or download this repository, then from the parent folder run:
+## 📦 Installation
 
-pip install -e ./watershed-delineation
+```bash
+pip install watershed-delineation
+```
 
+Requirements: Python 3.9 or later. Dependencies like `rasterio` and `geopandas` ship wheels for most platforms, but a recent `pip` is recommended.
 
-The "-e" flag installs the package in editable mode, so any code changes update immediately without reinstalling.
+---
 
-Dependencies
+## 🚀 Usage
 
-The package requires the following libraries (installed automatically):
+### From Python
 
-geopandas
-
-rasterio
-
-whitebox-tools
-
-pyproj
-
-numpy
-
-shapely
-
-You’ll also need a DEM raster (GeoTIFF) for your study area.
-
-Usage
-
-From Python
-
+```python
 from watershed_delineation.core import delineate_watershed
 
 # Input parameters
@@ -54,69 +40,71 @@ result_path = delineate_watershed(
 )
 
 print("Watershed shapefile saved at:", result_path)
+```
 
+---
 
-This creates a shapefile (and optionally a flow path shapefile) in the output folder.
+### From the Command Line
 
-From Command Line
+After installation, run:
 
-Once installed, you can run:
-
+```bash
 delineate_watershed "F:\data\dem.tif" 32.561170 39.835840 -o "C:\results" -n "my_basin" --export-lfp
-
+```
 
 Arguments:
 
-dem_file → Path to DEM raster (.tif)
+- `dem_file` → Path to DEM raster (`.tif`)
+- `pour_lon` → Longitude of pour point
+- `pour_lat` → Latitude of pour point
+- `-o`, `--output` → Output directory (default: current dir)
+- `-n`, `--name` → Base name of shapefile (default: watershed_lat_lon)
+- `--export-lfp` → Export Longest Flow Path shapefile
 
-pour_lon → Longitude of pour point
+---
 
-pour_lat → Latitude of pour point
+## 📂 Output
 
--o, --output → Output directory (default: current dir)
+- **`my_basin.shp`** → Watershed polygon shapefile with attributes:
+  - Area, perimeter
+  - Longest flow path length
+  - Form factor, circularity ratio
+  - Elevation statistics (min, max, mean)
+  - Mean slope
+  - Drainage density
+  - Pour point coordinates
 
--n, --name → Base name of shapefile (default: watershed_lon_lat)
+- **`my_basin_lfp.shp`** *(optional)* → Longest flow path polyline shapefile
 
---export-lfp → Export Longest Flow Path as shapefile
+---
 
-Output
+## 🛠 Development
 
-my_basin.shp → Watershed polygon shapefile with attributes:
+Clone and install in editable mode:
 
-Area, perimeter
+```bash
+git clone https://github.com/fyec/watershed-delineation.git
+cd watershed-delineation
+pip install -e .
+```
 
-Longest flow path
+Rebuild after code changes with:
 
-Form factor, circularity ratio
+```bash
+python -m build
+```
 
-Elevation stats
+---
 
-Slope stats
+## 📌 Project Links
 
-Drainage density
+- [Homepage](https://github.com/fyec/watershed-delineation)  
+- [Bug Tracker](https://github.com/fyec/watershed-delineation/issues)
 
-Pour point coordinates
+---
 
-my_basin_lfp.shp → (optional) Longest flow path shapefile
+## 👤 Author
 
-Development
-
-Folder structure:
-
-watershed-delineation/
-├── setup.py
-├── README.md
-└── watershed_delineation/
-    ├── __init__.py
-    ├── core.py   (core hydrology + delineation functions)
-    └── cli.py    (command line interface)
-
-
-Reinstall after changes:
-
-pip install -e ./watershed-delineation
-
-Author
-
-Developed by FYEC_SKasa
-Date: August 2025
+Developed by **FYEC**  
+Date: August 2025  
+License: MIT
