@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Aug 24 00:17:45 2025
-
-@author: FYEC_SKasa
-"""
-
-# -*- coding: utf-8 -*-
-"""
 Core functions for watershed delineation.
 """
 
@@ -24,19 +17,17 @@ from rasterio.features import rasterize
 from whitebox.whitebox_tools import WhiteboxTools
 
 # =============================================================================
-#
-# HELPER FUNCTIONS (No changes needed)
-#
+# HELPER FUNCTIONS
 # =============================================================================
 
 def utm_crs_from_lonlat(lon: float, lat: float) -> CRS:
-    """Determines the appropriate UTM zone CRS from a longitude and latitude."""
+    """Determine appropriate UTM zone CRS from lon/lat."""
     zone = int((lon + 180) // 6) + 1
     epsg = 32600 + zone if lat >= 0 else 32700 + zone
     return CRS.from_epsg(epsg)
 
 def utm_crs_from_polygon_centroid(poly_gdf: gpd.GeoDataFrame) -> CRS:
-    """Determines the appropriate UTM zone CRS from the centroid of a GeoDataFrame."""
+    """Determine UTM zone CRS from centroid of polygon GeoDataFrame."""
     wgs = poly_gdf.to_crs(4326)
     c = wgs.geometry.iloc[0].centroid
     zone = int((c.x + 180) // 6) + 1
@@ -44,14 +35,14 @@ def utm_crs_from_polygon_centroid(poly_gdf: gpd.GeoDataFrame) -> CRS:
     return CRS.from_epsg(epsg)
 
 def make_square_box_utm(lon: float, lat: float, half_size_m: float, utm_crs: CRS) -> gpd.GeoDataFrame:
-    """Creates a square GeoDataFrame buffer in a UTM projection."""
+    """Create square polygon buffer in UTM projection."""
     to_utm = Transformer.from_crs(CRS.from_epsg(4326), utm_crs, always_xy=True)
     x, y = to_utm.transform(lon, lat)
     sq = box(x - half_size_m, y - half_size_m, x + half_size_m, y + half_size_m)
     return gpd.GeoDataFrame(geometry=[sq], crs=utm_crs)
 
 def clip_dem_by_polygon(dem_path: str, poly_gdf: gpd.GeoDataFrame, out_path: str) -> str:
-    """Clips a DEM raster using a polygon GeoDataFrame."""
+    """Clip DEM raster using polygon."""
     dem_crs = rasterio.open(dem_path).crs
     if dem_crs is not None:
         poly_gdf = poly_gdf.to_crs(dem_crs)
@@ -68,7 +59,7 @@ def clip_dem_by_polygon(dem_path: str, poly_gdf: gpd.GeoDataFrame, out_path: str
     return out_path
 
 def make_pour_point_file(lon: float, lat: float, target_crs: CRS, out_path: str) -> str:
-    """Creates a shapefile for a single pour point."""
+    """Create shapefile for pour point."""
     gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(lon, lat)], crs="EPSG:4326")
     if target_crs is not None:
         gdf = gdf.to_crs(target_crs)
@@ -76,13 +67,13 @@ def make_pour_point_file(lon: float, lat: float, target_crs: CRS, out_path: str)
     return out_path
 
 def _assert_exists(path_str: str, step_name: str):
-    """Raises a RuntimeError if a file does not exist."""
+    """Ensure a file exists or raise error."""
     if not Path(path_str).exists():
-        raise RuntimeError(f"{step_name} did not produce the expected output: {path_str}")
+        raise RuntimeError(f"{step_name} did not produce expected output: {path_str}")
 
 def snap_point_to_flowacc(pour_pts_vec: str, acc_raster: str, snap_dist_m: float,
                           out_path: str, dem_crs: CRS):
-    """Move pour point to center of highest flow-accumulation cell within radius."""
+    """Snap pour point to highest accumulation cell within radius."""
     gdf = gpd.read_file(pour_pts_vec)
     if len(gdf) != 1:
         raise RuntimeError(f"Expected 1 pour point, found {len(gdf)}.")
@@ -113,13 +104,13 @@ def snap_point_to_flowacc(pour_pts_vec: str, acc_raster: str, snap_dist_m: float
 
         radius_px = max(1, int(math.ceil(snap_dist_m / max(px_m, py_m))))
         col, row = ~transform * (pt.x, pt.y)
-        col = int(round(col)); row = int(round(row))
-        r0 = max(0, row - radius_px); r1 = min(src.height - 1, row + radius_px)
-        c0 = max(0, col - radius_px); c1 = min(src.width - 1, col + radius_px)
+        col, row = int(round(col)), int(round(row))
+        r0, r1 = max(0, row - radius_px), min(src.height - 1, row + radius_px)
+        c0, c1 = max(0, col - radius_px), min(src.width - 1, col + radius_px)
 
         window = acc[r0:r1+1, c0:c1+1]
         if window.size == 0:
-            raise RuntimeError("Snap window is empty; increase SNAP_DIST_M or check DEM clip.")
+            raise RuntimeError("Snap window empty; increase SNAP_DIST_M or check DEM clip.")
 
         mask_valid = np.ones_like(window, dtype=bool)
         if nodata is not None:
@@ -130,14 +121,14 @@ def snap_point_to_flowacc(pour_pts_vec: str, acc_raster: str, snap_dist_m: float
 
         win_vals = np.where(mask_valid, window, -np.inf)
         idx = np.unravel_index(np.nanargmax(win_vals), win_vals.shape)
-        rr = r0 + idx[0]; cc = c0 + idx[1]
+        rr, cc = r0 + idx[0], c0 + idx[1]
         x_center, y_center = transform * (cc + 0.5, rr + 0.5)
 
     out_gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(x_center, y_center)], crs=dem_crs)
     out_gdf.to_file(out_path)
 
 def _pick_basin_polygon_from_vectorized(tmp_poly_path: str, snapped_pt_path: str, out_poly_path: str):
-    """Selects the correct watershed polygon after vectorization."""
+    """Select the correct watershed polygon from vectorized output."""
     polys = gpd.read_file(tmp_poly_path)
     if polys.empty:
         raise RuntimeError("Vectorization produced no polygons.")
@@ -177,65 +168,40 @@ def _pick_basin_polygon_from_vectorized(tmp_poly_path: str, snapped_pt_path: str
 
 
 # =============================================================================
-#
-# MAIN PROCESSING FUNCTION
-#
+# MAIN FUNCTION
 # =============================================================================
 
-def delineate_watershed(dem_path: str, pour_lon: float, pour_lat: float, output_dir: str, name: str, export_lfp: bool = False):
+def delineate_watershed(dem_path: str, pour_lon: float, pour_lat: float,
+                        output_dir: str, name: str, export_lfp: bool = False):
     """
-    Delineates a watershed from a pour point and computes its attributes.
-
-    Args:
-        dem_path (str): Path to the input Digital Elevation Model (DEM) raster file.
-        pour_lon (float): Longitude of the pour point.
-        pour_lat (float): Latitude of the pour point.
-        output_dir (str): Directory where the output shapefile will be saved.
-        name (str): Name for the output shapefile (e.g., "my_watershed").
-        export_lfp (bool): Whether to export the Longest Flow Path as a shapefile.
-
-    Returns:
-        str: Path to the generated watershed shapefile on success.
+    Delineates watershed and computes attributes.
+    Returns path to watershed shapefile.
     """
     try:
-        # ---- Hydrology calc params ----
         BUFFER_KM = 40
         SNAP_DIST_M = 1000
 
-        # ---- Prepare output paths and tools ----
-        print("Starting delineation process...")
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         out_poly_shp = str(Path(output_dir) / f"{name}.shp")
 
         wbt = WhiteboxTools()
         wbt.set_verbose_mode(False)
 
-        # ----------------------
-        # Stage 1: Delineate basin polygon from pour point
-        # ----------------------
-        print("Step 1: Preparing analysis area...")
+        # Stage 1: Delineation
         utm_for_box = utm_crs_from_lonlat(pour_lon, pour_lat)
         half = BUFFER_KM * 1000.0
         box_utm = make_square_box_utm(pour_lon, pour_lat, half, utm_for_box)
 
         with rasterio.open(dem_path) as src:
-            if src.crs is None:
-                dem_crs = CRS.from_epsg(4326)
-                print("Warning: DEM has no CRS; assuming EPSG:4326.")
-            else:
-                dem_crs = CRS.from_wkt(src.crs.to_wkt())
+            dem_crs = CRS.from_wkt(src.crs.to_wkt()) if src.crs else CRS.from_epsg(4326)
         box_dem = box_utm.to_crs(dem_crs)
 
         with tempfile.TemporaryDirectory() as tmp1:
             tmp_path = Path(tmp1)
-            print(f"Using temporary directory: {tmp_path}")
 
-            # Clip DEM by the box for faster processing
-            clipped_dem = str(tmp_path / "dem_clipped_for_delineation.tif")
+            clipped_dem = str(tmp_path / "dem_clipped.tif")
             clip_dem_by_polygon(dem_path, box_dem, clipped_dem)
-            print("Step 2: Clipped DEM to buffer area.")
 
-            # Define temporary file paths
             dem_breached = str(tmp_path / "dem_breached.tif")
             d8_pointer = str(tmp_path / "d8_pointer.tif")
             facc = str(tmp_path / "flow_acc.tif")
@@ -244,153 +210,87 @@ def delineate_watershed(dem_path: str, pour_lon: float, pour_lat: float, output_
             watershed_r = str(tmp_path / "watershed.tif")
             tmp_polys = str(tmp_path / "watershed_polys.shp")
 
-            # Create the initial pour point shapefile
             make_pour_point_file(pour_lon, pour_lat, dem_crs, pour_pts_vec)
 
-            # Perform core hydrology steps using WhiteboxTools
-            print("Step 3: Breaching depressions...")
-            wbt.breach_depressions(dem=clipped_dem, output=dem_breached)
-            _assert_exists(dem_breached, "BreachDepressions")
+            wbt.breach_depressions(dem=clipped_dem, output=dem_breached); _assert_exists(dem_breached, "Breach")
+            wbt.d8_pointer(dem=dem_breached, output=d8_pointer); _assert_exists(d8_pointer, "D8Pointer")
+            wbt.d8_flow_accumulation(i=dem_breached, output=facc, out_type="cells"); _assert_exists(facc, "FlowAccum")
 
-            print("Step 4: Calculating D8 flow direction...")
-            wbt.d8_pointer(dem=dem_breached, output=d8_pointer)
-            _assert_exists(d8_pointer, "D8Pointer")
-
-            print("Step 5: Calculating flow accumulation...")
-            wbt.d8_flow_accumulation(i=dem_breached, output=facc, out_type="cells")
-            _assert_exists(facc, "D8FlowAccumulation")
-
-            # Snap pour point and delineate watershed
-            print("Step 6: Snapping pour point to stream...")
             snap_point_to_flowacc(pour_pts_vec, facc, SNAP_DIST_M, pour_pts_snap, dem_crs)
-            _assert_exists(pour_pts_snap, "Manual snap")
+            _assert_exists(pour_pts_snap, "Snap")
 
-            print("Step 7: Delineating watershed raster...")
-            wbt.watershed(d8_pntr=d8_pointer, pour_pts=pour_pts_snap, output=watershed_r)
-            _assert_exists(watershed_r, "Watershed")
+            wbt.watershed(d8_pntr=d8_pointer, pour_pts=pour_pts_snap, output=watershed_r); _assert_exists(watershed_r, "Watershed")
+            wbt.raster_to_vector_polygons(i=watershed_r, output=tmp_polys); _assert_exists(tmp_polys, "Raster2Vector")
 
-            # Convert raster watershed to vector polygon
-            print("Step 8: Converting raster to vector polygon...")
-            wbt.raster_to_vector_polygons(i=watershed_r, output=tmp_polys)
-            _assert_exists(tmp_polys, "RasterToVectorPolygons")
-
-            print("Step 9: Selecting final basin and exporting...")
             _pick_basin_polygon_from_vectorized(tmp_polys, pour_pts_snap, out_poly_shp)
 
-        print("\n------------------------------------")
-        print("SUCCESS: Watershed delineation complete!")
-        print(f"Output saved to: {out_poly_shp}")
-        print("------------------------------------")
-
-        # ----------------------
-        # Stage 2: Compute attributes and add to shapefile
-        # ----------------------
-        print("Starting Stage 2: Computing attributes...")
+        # Stage 2: Attributes
         with tempfile.TemporaryDirectory() as tmp2:
             tmp_path = Path(tmp2)
-            print(f"Using temporary directory for Stage 2: {tmp_path}")
 
-            # Load polygon
             poly_gdf = gpd.read_file(out_poly_shp)
             if poly_gdf.crs is None:
                 poly_gdf.crs = dem_crs
 
-            # Get UTM CRS for accurate metrics
             utm_crs = utm_crs_from_polygon_centroid(poly_gdf)
             poly_utm = poly_gdf.to_crs(utm_crs)
 
             area_m2 = poly_utm.area.iloc[0]
             perimeter_m = poly_utm.length.iloc[0]
 
-            # Clip DEM tightly to polygon
-            clipped_dem = str(tmp_path / "dem_clipped.tif")
+            clipped_dem = str(tmp_path / "dem_clip2.tif")
             clip_dem_by_polygon(dem_path, poly_gdf, clipped_dem)
-            print("Clipped DEM to watershed polygon.")
 
-            # Breach, D8, FAC on clipped DEM
-            dem_breached = str(tmp_path / "dem_breached.tif")
-            wbt.breach_depressions(dem=clipped_dem, output=dem_breached)
-            _assert_exists(dem_breached, "BreachDepressions (Stage 2)")
+            dem_breached = str(tmp_path / "dem_breached2.tif")
+            d8_pointer = str(tmp_path / "d8_pointer2.tif")
+            facc = str(tmp_path / "flow_acc2.tif")
+            wbt.breach_depressions(dem=clipped_dem, output=dem_breached); _assert_exists(dem_breached, "Breach2")
+            wbt.d8_pointer(dem=dem_breached, output=d8_pointer); _assert_exists(d8_pointer, "D8Pointer2")
+            wbt.d8_flow_accumulation(i=dem_breached, output=facc, out_type="cells"); _assert_exists(facc, "FlowAccum2")
 
-            d8_pointer = str(tmp_path / "d8_pointer.tif")
-            wbt.d8_pointer(dem=dem_breached, output=d8_pointer)
-            _assert_exists(d8_pointer, "D8Pointer (Stage 2)")
-
-            facc = str(tmp_path / "flow_acc.tif")
-            wbt.d8_flow_accumulation(i=dem_breached, output=facc, out_type="cells")
-            _assert_exists(facc, "D8FlowAccumulation (Stage 2)")
-
-            # Rasterize polygon as basins mask
-            with rasterio.open(dem_breached) as src:
-                transform = src.transform
-                width, height = src.width, src.height
-                basins_raster = str(tmp_path / "basins.tif")
-                shapes = [(geom, 1) for geom in poly_gdf.geometry]
-                burned = rasterize(shapes, out_shape=(height, width), transform=transform, fill=0, dtype='uint8')
-                with rasterio.open(basins_raster, 'w', driver='GTiff', height=height, width=width, count=1, dtype='uint8',
-                                   crs=src.crs, transform=transform) as dst:
-                    dst.write(burned, 1)
-            print("Rasterized basin mask.")
-
-            # Longest flow path
-            lfp_vec = str(tmp_path / "longest_flowpath.shp")
-            wbt.longest_flowpath(dem=dem_breached, basins=basins_raster, output=lfp_vec)
-            _assert_exists(lfp_vec, "LongestFlowpath")
+            # LFP
+            lfp_vec = str(tmp_path / "lfp.shp")
+            wbt.longest_flowpath(dem=dem_breached, basins=clipped_dem, output=lfp_vec); _assert_exists(lfp_vec, "LFP")
             lfp_gdf = gpd.read_file(lfp_vec)
             if lfp_gdf.crs is None:
                 lfp_gdf.crs = dem_crs
 
-            # keep only the single longest line
-            lfp_gdf["length"] = lfp_gdf.length
-            lfp_gdf = lfp_gdf.loc[[lfp_gdf["length"].idxmax()]].drop(columns="length")
-
+            # FIX: compute length in UTM
             lfp_utm = lfp_gdf.to_crs(utm_crs)
-            lfp_length_m = lfp_utm.length.sum()
-            print("Computed longest flow path (kept only max length).")
+            lfp_utm["__len_m"] = lfp_utm.length
+            longest_idx = lfp_utm["__len_m"].idxmax()
+            lfp_gdf = lfp_gdf.loc[[longest_idx]]
+            lfp_length_m = float(lfp_utm.loc[longest_idx, "__len_m"])
 
             if export_lfp:
                 out_lfp_shp = str(Path(output_dir) / f"{name}_lfp.shp")
                 lfp_gdf.to_file(out_lfp_shp)
-                print(f"Exported Longest Flow Path to: {out_lfp_shp}")
 
-            # Shape factors
-            basin_length = lfp_length_m
-            form_factor = area_m2 / (basin_length ** 2) if basin_length > 0 else np.nan
+            form_factor = area_m2 / (lfp_length_m ** 2) if lfp_length_m > 0 else np.nan
             circularity_ratio = (4 * math.pi * area_m2) / (perimeter_m ** 2) if perimeter_m > 0 else np.nan
 
             # Elevation stats
             with rasterio.open(dem_breached) as src:
                 data = src.read(1)
                 valid = (data != src.nodata) & np.isfinite(data)
-                if valid.any():
-                    elev_min = data[valid].min()
-                    elev_max = data[valid].max()
-                    elev_mean = data[valid].mean()
-                else:
-                    elev_min = elev_max = elev_mean = np.nan
-            print("Computed elevation statistics.")
+                elev_min = data[valid].min() if valid.any() else np.nan
+                elev_max = data[valid].max() if valid.any() else np.nan
+                elev_mean = data[valid].mean() if valid.any() else np.nan
 
-            # Slope stats
+            # Slope
             slope_raster = str(tmp_path / "slope.tif")
-            wbt.slope(dem=dem_breached, output=slope_raster, units="degrees")
-            _assert_exists(slope_raster, "Slope")
+            wbt.slope(dem=dem_breached, output=slope_raster, units="degrees"); _assert_exists(slope_raster, "Slope")
             with rasterio.open(slope_raster) as src:
                 data = src.read(1)
                 valid = (data != src.nodata) & np.isfinite(data)
-                if valid.any():
-                    slope_mean = data[valid].mean()
-                else:
-                    slope_mean = np.nan
-            print("Computed slope statistics.")
+                slope_mean = data[valid].mean() if valid.any() else np.nan
 
-            # Drainage density
-            thresh = 50
+            # Drainage density (simplified)
             streams_raster = str(tmp_path / "streams.tif")
-            wbt.extract_streams(flow_accum=facc, output=streams_raster, threshold=thresh)
-            _assert_exists(streams_raster, "ExtractStreams")
-
+            wbt.extract_streams(flow_accum=facc, output=streams_raster, threshold=50)
             streams_vec = str(tmp_path / "streams.shp")
             wbt.raster_streams_to_vector(streams=streams_raster, d8_pntr=d8_pointer, output=streams_vec)
+
             if Path(streams_vec).exists():
                 streams_gdf = gpd.read_file(streams_vec)
                 if streams_gdf.crs is None:
@@ -399,12 +299,10 @@ def delineate_watershed(dem_path: str, pour_lon: float, pour_lat: float, output_
                 total_stream_length_m = streams_utm.length.sum()
             else:
                 total_stream_length_m = 0.0
-                print("No streams extracted; setting drainage density to 0.")
             area_km2 = area_m2 / 1e6
             drainage_density = (total_stream_length_m / 1000) / area_km2 if area_km2 > 0 else np.nan
-            print("Computed drainage density.")
 
-            # Add attributes to poly_gdf
+            # Save attributes
             poly_gdf['area_m2'] = area_m2
             poly_gdf['perim_m'] = perimeter_m
             poly_gdf['lfp_m'] = lfp_length_m
@@ -418,16 +316,10 @@ def delineate_watershed(dem_path: str, pour_lon: float, pour_lat: float, output_
             poly_gdf['pour_lon'] = pour_lon
             poly_gdf['pour_lat'] = pour_lat
 
-            # Resave shapefile with attributes
             poly_gdf.to_file(out_poly_shp)
-            print("Added attributes to shapefile.")
 
-        print("\n------------------------------------")
-        print("SUCCESS: Attributes computation complete!")
-        print("------------------------------------")
         return out_poly_shp
 
     except Exception as e:
-        print(f"\nERROR: An error occurred during processing.")
-        print(f"Details: {str(e)}")
+        print(f"ERROR: {e}")
         return None
