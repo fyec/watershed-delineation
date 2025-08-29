@@ -36,7 +36,15 @@ result_path = delineate_watershed(
     pour_lat=pour_lat,
     output_dir=output_dir,
     name=watershed_name,
-    export_lfp=True   # also export Longest Flow Path
+    buffer_km=50.0,                # buffer half-size in km for DEM clip box
+    snap_dist_m=None,              # snapping radius in meters (None = auto)
+    snap_multiplier=20,            # multiplier for auto snap distance (default)
+    export_lfp=True,               # also export Longest Flow Path
+    export_pour_point=True,        # export original pour point (WGS84)
+    export_snapped_pour_point=True,# export snapped pour point (DEM CRS)
+    export_clip_dem=True,          # export basin-clipped DEM
+    export_flow_direction=True,    # export final D8 raster
+    export_flow_accumulation=True  # export final FAC raster
 )
 
 print("Watershed shapefile saved at:", result_path)
@@ -49,7 +57,7 @@ print("Watershed shapefile saved at:", result_path)
 After installation, run:
 
 ```bash
-delineate_watershed "F:\data\dem.tif" 32.561170 39.835840 -o "C:\results" -n "my_basin" --export-lfp
+delineate_watershed "F:\data\dem.tif" 32.561170 39.835840 -o "C:\results" -n "my_basin" --buffer-km 50 --snap-dist-m 1500 --export-lfp --export-pour-point --export-snapped-pour-point --export-clip-dem --export-flow-direction --export-flow-accumulation
 ```
 
 Arguments:
@@ -59,7 +67,15 @@ Arguments:
 - `pour_lat` → Latitude of pour point
 - `-o`, `--output` → Output directory (default: current dir)
 - `-n`, `--name` → Base name of shapefile (default: watershed_lat_lon)
+- `--buffer-km` → Buffer half-side in kilometers (default: 25)
+- `--snap-dist-m` → Snap distance in meters (default: None, uses auto)
+- `--snap-multiplier` → Multiplier for estimating snap distance (default: 20)
 - `--export-lfp` → Export Longest Flow Path shapefile
+- `--export-pour-point` → Export input pour point (WGS84)
+- `--export-snapped-pour-point` → Export snapped pour point (DEM CRS)
+- `--export-clip-dem` → Export basin-clipped DEM
+- `--export-flow-direction` → Export final D8 pointer raster
+- `--export-flow-accumulation` → Export final flow accumulation raster
 
 ---
 
@@ -73,8 +89,14 @@ Arguments:
   - Mean slope
   - Drainage density
   - Pour point coordinates
+  - UTM zone metadata for delineation & attributes
 
-- **`my_basin_lfp.shp`** *(optional)* → Longest flow path polyline shapefile
+- **`my_basin_lfp.shp`** *(optional)* → Longest flow path polyline shapefile  
+- **`my_basin_pourpoint_wgs84.shp`** *(optional)* → Input pour point in WGS84  
+- **`my_basin_pourpoint_snapped.shp`** *(optional)* → Snapped pour point in DEM CRS  
+- **`my_basin_dem_clip_basin.tif`** *(optional)* → Basin-clipped DEM raster  
+- **`my_basin_d8.tif`** *(optional)* → Final D8 pointer raster  
+- **`my_basin_facc.tif`** *(optional)* → Final flow accumulation raster  
 
 ---
 
