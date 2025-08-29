@@ -50,6 +50,26 @@ result_path = delineate_watershed(
 print("Watershed shapefile saved at:", result_path)
 ```
 
+WHAT IS "BUFFER SIZE" (buffer_km)?
+----------------------------------
+During Stage 1 we clip a square around the pour point to keep the DEM small and
+processing fast. buffer_km is **half the side length in kilometers** for that
+square (so the full square is 2 * buffer_km on each side). A larger buffer
+reduces the risk that the watershed extends beyond the clipped area, but takes
+longer and uses more memory. Default: 100 km (safe for most basins).
+
+WHAT IS "SNAP SIZE" (snap_dist_m / snap_multiplier)?
+----------------------------------------------------
+Pour points rarely sit exactly on the highest-accumulation cell. We "snap" the
+pour point to the cell with the highest flow accumulation within a search
+radius. If you **don’t** pass snap_dist_m, we estimate it from the DEM’s pixel
+size and multiply by snap_multiplier (default 20). This keeps the search window
+proportional to DEM resolution (e.g., for a 30 m DEM → ~600 m default radius).
+
+You can override both:
+- Pass buffer_km explicitly to widen/narrow the initial DEM clip.
+- Pass snap_dist_m explicitly (in meters) or change snap_multiplier (int).
+
 ---
 
 ### From the Command Line
