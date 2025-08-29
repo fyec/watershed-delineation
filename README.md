@@ -56,7 +56,7 @@ During Stage 1 we clip a square around the pour point to keep the DEM small and
 processing fast. buffer_km is **half the side length in kilometers** for that
 square (so the full square is 2 * buffer_km on each side). A larger buffer
 reduces the risk that the watershed extends beyond the clipped area, but takes
-longer and uses more memory. Default: 100 km (safe for most basins).
+longer and uses more memory. Default: 50 km (safe for most basins).
 
 WHAT IS "SNAP SIZE" (snap_dist_m / snap_multiplier)?
 ----------------------------------------------------
